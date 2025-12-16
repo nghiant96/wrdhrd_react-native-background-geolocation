@@ -1,17 +1,17 @@
 {
-  "name": "@wrdhrd/react-native-background-geolocation",
-  "version": "3.0.4",
+  "name": "@nghiant96/react-native-background-geolocation",
+  "version": "0.0.1",
   "description": "Optimized background location tracking",
   "main": "./index.js",
   "types": "./index.d.ts",
   "scripts": {
-    "link": "@wrdhrd/react-native-background-geolocation/scripts/postlink.js",
-    "unlink": "@wrdhrd/react-native-background-geolocation/scripts/postunlink.js",
+    "link": "@nghiant96/react-native-background-geolocation/scripts/postlink.js",
+    "unlink": "@nghiant96/react-native-background-geolocation/scripts/postunlink.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/WrdHrd-Technologies/react-native-background-geolocation.git"
+    "url": "git+https://github.com/nghiant96/react-native-background-geolocation.git"
   },
   "keywords": [
     "gps",
@@ -33,9 +33,9 @@
   ],
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/WrdHrd-Technologies/react-native-background-geolocation/issues"
+    "url": "https://github.com/nghiant96/react-native-background-geolocation/issues"
   },
-  "homepage": "https://github.com/WrdHrd-Technologies/react-native-background-geolocation#readme",
+  "homepage": "https://github.com/nghiant96/react-native-background-geolocation#readme",
   "dependencies": {
     "plist": "^3.0.1"
   },

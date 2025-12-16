@@ -14,7 +14,7 @@ import java.util.List;
 
 public class AutoStartHelper {
 
-    public static final String MY_PREFS_FILENAME = "com.wrdhrd.sharedpreference";
+    public static final String MY_PREFS_FILENAME = "com.nghiant96.sharedpreference";
 
     /***
      * Xiaomi
