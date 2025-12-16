@@ -7,7 +7,7 @@ Original Repo: [@mauron85/react-native-background-geolocation](https://github.co
 ## Installation
 
 ```
-npm i github:rafwell/nghiant96_react-native-background-geolocation#3.0.4
+npm i nghiant96_react-native-background-geolocation
 ```
 
 ### Automatic setup
@@ -27,10 +27,10 @@ In `android/settings.gradle`
 
 ```gradle
 ...
-include ':@nghiant96_react-native-background-geolocation-common'
-project(':@nghiant96_react-native-background-geolocation-common').projectDir = new File(rootProject.projectDir, '../node_modules/@nghiant96/react-native-background-geolocation/android/common')
-include ':@nghiant96_react-native-background-geolocation'
-project(':@nghiant96_react-native-background-geolocation').projectDir = new File(rootProject.projectDir, '../node_modules/@nghiant96/react-native-background-geolocation/android/lib')
+include ':nghiant96_react-native-background-geolocation-common'
+project(':nghiant96_react-native-background-geolocation-common').projectDir = new File(rootProject.projectDir, '../node_modules/@nghiant96/react-native-background-geolocation/android/common')
+include ':nghiant96_react-native-background-geolocation'
+project(':nghiant96_react-native-background-geolocation').projectDir = new File(rootProject.projectDir, '../node_modules/@nghiant96/react-native-background-geolocation/android/lib')
 ...
 ```
 
