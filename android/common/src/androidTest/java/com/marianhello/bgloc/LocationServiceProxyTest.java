@@ -9,7 +9,7 @@ import android.os.IBinder;
 import android.support.test.InstrumentationRegistry;
 import android.support.test.rule.ServiceTestRule;
 import android.support.test.runner.AndroidJUnit4;
-import android.support.v4.content.LocalBroadcastManager;
+import androidx.core.content.LocalBroadcastManager;
 
 import com.marianhello.bgloc.provider.TestLocationProviderFactory;
 import com.marianhello.bgloc.service.LocationServiceImpl;
