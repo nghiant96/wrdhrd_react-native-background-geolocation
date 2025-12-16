@@ -14,8 +14,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.provider.Settings.SettingNotFoundException;
-import androidx.core.content.ContextCompat;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.text.TextUtils;
 
 import com.github.jparkie.promise.Promise;
@@ -51,22 +51,8 @@ public class BackgroundGeolocationFacade {
     public static final int SERVICE_STOPPED = 0;
     public static final int AUTHORIZATION_AUTHORIZED = 1;
     public static final int AUTHORIZATION_DENIED = 0;
-    
-    public static final String[] INITIALPERMISSIONS = new String[]{
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.ACCESS_FINE_LOCATION
-    };
-    public static final String[] BACKGROUNDLOCATIONPERMISSION = new String[]{
-            Manifest.permission.ACCESS_BACKGROUND_LOCATION
-    };
 
-    public static final String[] PERMISSIONS = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ? new String[]{
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_BACKGROUND_LOCATION
-    }
-    :
-    new String[]{
+    public static final String[] PERMISSIONS = new String[]{
             Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.ACCESS_FINE_LOCATION
     };
@@ -87,7 +73,6 @@ public class BackgroundGeolocationFacade {
     public BackgroundGeolocationFacade(Context context, PluginDelegate delegate) {
         mContext = context;
         mDelegate = delegate;
-
         mService = new LocationServiceProxy(context);
 
         UncaughtExceptionLogger.register(context.getApplicationContext());
@@ -230,38 +215,14 @@ public class BackgroundGeolocationFacade {
         logger.debug("Starting service");
 
         PermissionManager permissionManager = PermissionManager.getInstance(getContext());
-         permissionManager.checkPermissions(Arrays.asList(INITIALPERMISSIONS), new PermissionManager.PermissionRequestListener() {
+        permissionManager.checkPermissions(Arrays.asList(PERMISSIONS), new PermissionManager.PermissionRequestListener() {
             @Override
             public void onPermissionGranted() {
-                logger.info("User granted initial requested permissions");
-
-                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q){
-                    permissionManager.checkPermissions(Arrays.asList(BACKGROUNDLOCATIONPERMISSION), new PermissionManager.PermissionRequestListener() {
-                        @Override
-                        public void onPermissionGranted() {
-                            logger.info("User granted background location permissions");
-                            // watch location mode changes
-                            registerLocationModeChangeReceiver();
-                            registerServiceBroadcast();
-                            startBackgroundService();
-                        }
-
-                        @Override
-                        public void onPermissionDenied() {
-                            logger.info("User denied background location permissions");
-                            if (mDelegate != null) {
-                                mDelegate.onAuthorizationChanged(BackgroundGeolocationFacade.AUTHORIZATION_DENIED);
-                            }
-                        }
-                    });
-                }
-                else {
-                    // watch location mode changes
-                    registerLocationModeChangeReceiver();
-                    registerServiceBroadcast();
-                    startBackgroundService();
-                }
-                
+                logger.info("User granted requested permissions");
+                // watch location mode changes
+                registerLocationModeChangeReceiver();
+                registerServiceBroadcast();
+                startBackgroundService();
             }
 
             @Override

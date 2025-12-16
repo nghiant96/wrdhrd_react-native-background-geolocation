@@ -9,8 +9,6 @@ This is a new class
 
 package com.marianhello.bgloc.service;
 
-import android.content.pm.ServiceInfo;
-import android.annotation.SuppressLint;
 import android.accounts.Account;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -31,10 +29,8 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Process;
-import android.os.PowerManager;
-import androidx.annotation.Nullable;
-import androidx.core.app.NotificationCompat;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import android.support.annotation.Nullable;
+import android.support.v4.content.LocalBroadcastManager;
 
 import com.marianhello.bgloc.Config;
 import com.marianhello.bgloc.ConnectivityListener;
@@ -62,7 +58,6 @@ import com.marianhello.bgloc.sync.AccountHelper;
 import com.marianhello.bgloc.sync.SyncService;
 import com.marianhello.logging.LoggerManager;
 import com.marianhello.logging.UncaughtExceptionLogger;
-
 
 import org.chromium.content.browser.ThreadUtils;
 import org.json.JSONException;
@@ -110,7 +105,6 @@ public class LocationServiceImpl extends Service implements ProviderDelegate, Lo
 
     /** notification id */
     private static int NOTIFICATION_ID = 1;
-    private static int PERMISSION_NOTIFICATION_ID = 2;
 
     private ResourceResolver mResolver;
     private Config mConfig;
@@ -133,7 +127,6 @@ public class LocationServiceImpl extends Service implements ProviderDelegate, Lo
 
     private static LocationTransform sLocationTransform;
     private static LocationProviderFactory sLocationProviderFactory;
-    private PowerManager.WakeLock wakeLock;                 // PARTIAL_WAKELOCK
 
     private class ServiceHandler extends Handler {
         public ServiceHandler(Looper looper) {
@@ -150,13 +143,8 @@ public class LocationServiceImpl extends Service implements ProviderDelegate, Lo
      * When binding to the service, we return an interface to our messenger
      * for sending messages to the service.
      */
-    @SuppressLint("WakelockTimeout")
     @Override
     public IBinder onBind(Intent intent) {
-        if (wakeLock != null && !wakeLock.isHeld()) {
-            wakeLock.acquire();
-            logger.debug("WAKELOCK acquired");
-        }
         logger.debug("Client binds to service");
         return mBinder;
     }
@@ -210,10 +198,6 @@ public class LocationServiceImpl extends Service implements ProviderDelegate, Lo
 
         mLocationDAO = DAOFactory.createLocationDAO(this);
 
-        // PARTIAL_WAKELOCK
-        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"com.marianhello.backgroundgeolocation:wakelock");
-
         mPostLocationTask = new PostLocationTask(mLocationDAO,
                 new PostLocationTask.PostLocationTaskListener() {
                     @Override
@@ -244,12 +228,6 @@ public class LocationServiceImpl extends Service implements ProviderDelegate, Lo
     @Override
     public void onDestroy() {
         logger.info("Destroying LocationServiceImpl");
-
-        // PARTIAL_WAKELOCK
-        if (wakeLock != null && wakeLock.isHeld()) {
-            wakeLock.release();
-            logger.info("WAKELOCK released");
-        }
 
         // workaround for issue #276
         if (mProvider != null) {
@@ -436,18 +414,8 @@ public class LocationServiceImpl extends Service implements ProviderDelegate, Lo
                 mProvider.onCommand(LocationProvider.CMD_SWITCH_MODE,
                         LocationProvider.FOREGROUND_MODE);
             }
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    super.startForeground(NOTIFICATION_ID, notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
-                }
-                else {
-                    super.startForeground(NOTIFICATION_ID, notification);
-                }
-                mIsInForeground = true;
-            } catch(Exception error) {
-                logger.error("Forground Error: {}", error.getMessage());
-            }
-
+            super.startForeground(NOTIFICATION_ID, notification);
+            mIsInForeground = true;
         }
     }
 
@@ -498,7 +466,6 @@ public class LocationServiceImpl extends Service implements ProviderDelegate, Lo
 
                             NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
                             notificationManager.notify(NOTIFICATION_ID, notification);
-                            notificationManager.cancel(PERMISSION_NOTIFICATION_ID);
                         }
                     }
                 }
@@ -641,27 +608,12 @@ public class LocationServiceImpl extends Service implements ProviderDelegate, Lo
         });
     }
 
-    private void postError(PluginException error) {
-        mPostLocationTask.add(error);
-    }
-
     @Override
     public void onError(PluginException error) {
-        Config config = getConfig();
         Bundle bundle = new Bundle();
         bundle.putInt("action", MSG_ON_ERROR);
         bundle.putBundle("payload", error.toBundle());
         broadcastMessage(bundle);
-        postError(error);
-        if(error.getCode() == PluginException.PERMISSION_DENIED_ERROR) {
-            NotificationCompat.Builder builder = new NotificationCompat.Builder(LocationServiceImpl.this, NotificationHelper.ANDROID_PERMISSIONS_CHANNEL_ID);
-            builder.setContentTitle("Permission Denied");
-            builder.setContentText("Location Permission is denied. Please Allow the location.");
-            builder.setSmallIcon(android.R.drawable.ic_dialog_info);
-            NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            notificationManager.notify(PERMISSION_NOTIFICATION_ID, builder.build());
-        }
-
     }
 
     private void broadcastMessage(int msgId) {
@@ -678,12 +630,7 @@ public class LocationServiceImpl extends Service implements ProviderDelegate, Lo
 
     @Override
     public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            return super.registerReceiver(receiver, filter, null , mServiceHandler, Context.RECEIVER_EXPORTED);
-        } else {
-           return super.registerReceiver(receiver, filter, null, mServiceHandler);
-        }
-        
+        return super.registerReceiver(receiver, filter, null, mServiceHandler);
     }
 
     @Override

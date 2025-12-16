@@ -17,7 +17,7 @@ import android.location.Location;
 import android.media.AudioManager;
 import android.provider.Settings;
 import android.widget.Toast;
-import android.os.Build;
+
 import com.google.android.gms.location.DetectedActivity;
 import com.marianhello.bgloc.Config;
 import com.marianhello.bgloc.PluginException;
@@ -26,8 +26,6 @@ import com.marianhello.bgloc.data.BackgroundLocation;
 import com.marianhello.logging.LoggerManager;
 import com.marianhello.utils.ToneGenerator;
 import com.marianhello.utils.ToneGenerator.Tone;
-import com.marianhello.bgloc.data.BatteryInfo;
-import java.lang.reflect.Field;
 
 /**
  * AbstractLocationProvider
@@ -79,16 +77,6 @@ public abstract class AbstractLocationProvider implements LocationProvider {
      * @param receiver
      */
     protected Intent registerReceiver (BroadcastReceiver receiver, IntentFilter filter) {
-        if (Build.VERSION.SDK_INT >= 34) {
-            try {
-                Field receiverExportedField = Context.class.getField("RECEIVER_NOT_EXPORTED");
-                int receiverExported = receiverExportedField.getInt(null);
-                return mContext.registerReceiver(receiver, filter, receiverExported);
-            } catch (NoSuchFieldException | IllegalAccessException e) {
-                throw new RuntimeException(e);
-            }
-
-        }
         return mContext.registerReceiver(receiver, filter);
     }
 
@@ -107,8 +95,7 @@ public abstract class AbstractLocationProvider implements LocationProvider {
     protected void handleLocation (Location location) {
         playDebugTone(Tone.BEEP);
         if (mDelegate != null) {
-            BatteryInfo batteryInfo = new BatteryInfo(mContext);
-            BackgroundLocation bgLocation = new BackgroundLocation(PROVIDER_ID, location,batteryInfo);
+            BackgroundLocation bgLocation = new BackgroundLocation(PROVIDER_ID, location);
             bgLocation.setMockLocationsEnabled(hasMockLocationsEnabled());
             mDelegate.onLocation(bgLocation);
         }
@@ -123,8 +110,7 @@ public abstract class AbstractLocationProvider implements LocationProvider {
     protected void handleStationary (Location location, float radius) {
         playDebugTone(Tone.LONG_BEEP);
         if (mDelegate != null) {
-            BatteryInfo batteryInfo = new BatteryInfo(mContext);
-            BackgroundLocation bgLocation = new BackgroundLocation(PROVIDER_ID, location,batteryInfo);
+            BackgroundLocation bgLocation = new BackgroundLocation(PROVIDER_ID, location);
             bgLocation.setRadius(radius);
             bgLocation.setMockLocationsEnabled(hasMockLocationsEnabled());
             mDelegate.onStationary(bgLocation);
@@ -139,8 +125,7 @@ public abstract class AbstractLocationProvider implements LocationProvider {
     protected void handleStationary (Location location) {
         playDebugTone(Tone.LONG_BEEP);
         if (mDelegate != null) {
-            BatteryInfo batteryInfo = new BatteryInfo(mContext);
-            BackgroundLocation bgLocation = new BackgroundLocation(PROVIDER_ID, location,batteryInfo);
+            BackgroundLocation bgLocation = new BackgroundLocation(PROVIDER_ID, location);
             bgLocation.setMockLocationsEnabled(hasMockLocationsEnabled());
             mDelegate.onStationary(bgLocation);
         }

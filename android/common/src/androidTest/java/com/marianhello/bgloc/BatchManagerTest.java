@@ -112,9 +112,6 @@ public class BatchManagerTest {
         for (int j = i; j < 100; j++) {
             BackgroundLocation location = new BackgroundLocation();
             location.setTime(1000 + i);
-            location.setRealTime(1000 + i);
-            location.setElapsedRealtimeNanos(10 + i);
-            location.setBatteryLevel(100 - i * 0.5);
             location.setLatitude(40.21 + i);
             location.setLongitude(23.45 + i);
             location.setAccuracy(200 +i);
@@ -157,9 +154,6 @@ public class BatchManagerTest {
             Assert.assertEquals(20 + i, l.getSpeed(), 0);
             Assert.assertEquals("test", l.getProvider());
             Assert.assertEquals(1000 + i, l.getTime(), 0);
-            Assert.assertEquals(1000 + i, l.getRealTime(), 0);
-            Assert.assertEquals(10 + i, l.getElapsedRealtimeNanos(), 0);
-            Assert.assertEquals(100 - i * 0.5, l.getBatteryLevel(), 0);
             i++;
         }
     }
@@ -171,9 +165,6 @@ public class BatchManagerTest {
         for (int i = 1; i < 3; i++) {
             BackgroundLocation location = new BackgroundLocation();
             location.setTime(1000 * i);
-            location.setRealTime(1000 * i);
-            location.setElapsedRealtimeNanos(10 * i);
-            location.setBatteryLevel(100 - i * 0.5);
             location.setLatitude(30.21 + i);
             location.setLongitude(13.45 + i);
             location.setBatchStartMillis(1000L);
@@ -239,9 +230,6 @@ public class BatchManagerTest {
         for (int i = 1; i < 3; i++) {
             BackgroundLocation location = new BackgroundLocation();
             location.setTime(1000 * i);
-            location.setRealTime(1000 * i);
-            location.setElapsedRealtimeNanos(10 * i);
-            location.setBatteryLevel(100 - i * 0.5);
             location.setLatitude(30.21 + i);
             location.setLongitude(13.45 + i);
             location.setBatchStartMillis(1000L);
@@ -317,9 +305,6 @@ public class BatchManagerTest {
             location = new BackgroundLocation();
             location.setProvider("test");
             location.setTime(1000 + i);
-            location.setRealTime(1000 + i);
-            location.setElapsedRealtimeNanos(10 + i);
-            location.setBatteryLevel(100 - i * 0.5);
             location.setLatitude(40.21 + i);
             location.setLongitude(23.45 + i);
             location.setAccuracy(200 +i);
@@ -364,9 +349,6 @@ public class BatchManagerTest {
             BackgroundLocation location = new BackgroundLocation();
             location.setProvider("test");
             location.setTime(1000 * i);
-            location.setRealTime(1000 * i);
-            location.setElapsedRealtimeNanos(10 * i);
-            location.setBatteryLevel(100 - i * 0.5);
             location.setAltitude(999 + i);
             location.setLatitude(30.21 + i);
             location.setLongitude(13.45 + i);
@@ -455,9 +437,6 @@ public class BatchManagerTest {
             BackgroundLocation location = new BackgroundLocation();
             location.setProvider("test");
             location.setTime(1000 * i);
-            location.setRealTime(1000 * i);
-            location.setElapsedRealtimeNanos(10 * i);
-            location.setBatteryLevel(100 - i * 0.5);
             location.setAltitude(999 + i);
             location.setLatitude(30.21 + i);
             location.setLongitude(13.45 + i);

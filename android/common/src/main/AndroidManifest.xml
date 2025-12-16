@@ -20,12 +20,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.marianhello.backgroundgeolocation" android:versionName="1.0" android:versionCode="1">
     <application>
-        <service android:name=".floatingview.FloatingViewService" android:foregroundServiceType="location" android:exported="false" />
         <service
             android:name="com.marianhello.bgloc.sync.SyncService"
             android:exported="true"
-            android:process=":sync" 
-            android:foregroundServiceType="dataSync">
+            android:process=":sync">
             <intent-filter>
                 <action android:name="android.content.SyncAdapter"/>
             </intent-filter>
@@ -46,7 +44,7 @@
             android:authorities="@string/mauron85_bgloc_content_authority"
             android:exported="false"
             android:syncable="true"/>
-        <service android:enabled="true" android:exported="false" android:name="com.marianhello.bgloc.service.LocationServiceImpl" android:foregroundServiceType="location|dataSync" />
+        <service android:enabled="true" android:exported="false" android:name="com.marianhello.bgloc.service.LocationServiceImpl" android:foregroundServiceType="location" />
         <receiver android:enabled="true" android:exported="true" android:name="com.marianhello.bgloc.BootCompletedReceiver">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
@@ -60,10 +58,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_LOCATION_EXTRA_COMMANDS" />
-     <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_SYNC_SETTINGS"/>
     <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS"/>

@@ -9,8 +9,8 @@ import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.os.Build;
-import androidx.annotation.RequiresApi;
-import androidx.core.app.NotificationCompat;
+import android.support.annotation.RequiresApi;
+import android.support.v4.app.NotificationCompat;
 
 import com.marianhello.bgloc.ResourceResolver;
 import com.marianhello.logging.LoggerManager;
@@ -76,14 +76,6 @@ public class NotificationHelper {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 PendingIntent contentIntent = PendingIntent.getActivity(appContext, 0, launchIntent, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
                 builder.setContentIntent(contentIntent);
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                builder.setCategory(Notification.CATEGORY_NAVIGATION);
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                builder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE);
             }
 
             Notification notification = builder.build();

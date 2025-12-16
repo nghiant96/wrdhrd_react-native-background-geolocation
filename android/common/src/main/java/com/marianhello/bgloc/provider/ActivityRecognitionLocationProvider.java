@@ -232,27 +232,25 @@ public class ActivityRecognitionLocationProvider extends AbstractLocationProvide
     private BroadcastReceiver detectedActivitiesReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (ActivityRecognitionResult.hasResult(intent)){
-                ActivityRecognitionResult result = ActivityRecognitionResult.extractResult(intent);
-                ArrayList<DetectedActivity> detectedActivities = (ArrayList) result.getProbableActivities();
+            ActivityRecognitionResult result = ActivityRecognitionResult.extractResult(intent);
+            ArrayList<DetectedActivity> detectedActivities = (ArrayList) result.getProbableActivities();
 
-                //Find the activity with the highest percentage
-                lastActivity = getProbableActivity(detectedActivities);
+            //Find the activity with the highest percentage
+            lastActivity = getProbableActivity(detectedActivities);
 
-                logger.debug("Detected activity={} confidence={}", BackgroundActivity.getActivityString(lastActivity.getType()), lastActivity.getConfidence());
+            logger.debug("Detected activity={} confidence={}", BackgroundActivity.getActivityString(lastActivity.getType()), lastActivity.getConfidence());
 
-                handleActivity(lastActivity);
+            handleActivity(lastActivity);
 
-                if (lastActivity.getType() == DetectedActivity.STILL) {
-                    showDebugToast("Detected STILL Activity");
-                    // stopTracking();
-                    // we will delay stop tracking after position is found
-                } else {
-                    showDebugToast("Detected ACTIVE Activity");
-                    startTracking();
-                }
-                //else do nothing
+            if (lastActivity.getType() == DetectedActivity.STILL) {
+                showDebugToast("Detected STILL Activity");
+                // stopTracking();
+                // we will delay stop tracking after position is found
+            } else {
+                showDebugToast("Detected ACTIVE Activity");
+                startTracking();
             }
+            //else do nothing
         }
     };
 
