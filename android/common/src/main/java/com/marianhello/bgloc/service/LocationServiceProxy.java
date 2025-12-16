@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.Build;
 
 import com.marianhello.bgloc.Config;
+import com.marianhello.bgloc.Setting;
 
 public class LocationServiceProxy implements LocationService, LocationServiceInfo {
     private final Context mContext;
@@ -98,6 +99,11 @@ public class LocationServiceProxy implements LocationService, LocationServiceInf
     }
 
     @Override
+    public void setting(Setting setting) {
+
+    }
+
+    @Override
     public void startForeground() {
         if (!isStarted()) { return; }
 
@@ -125,6 +131,21 @@ public class LocationServiceProxy implements LocationService, LocationServiceInf
     }
 
     private void executeIntentCommand(Intent intent) {
-        mContext.startService(intent);
+        try{
+            mContext.startService(intent);
+        } catch (IllegalStateException e) {
+            try{
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    mContext.startForegroundService(intent);
+                } else {
+                    mContext.startService(intent);
+                }
+            } catch (Exception ex) {
+                
+            }
+        }
+        catch(Exception ex){
+            
+        }
     }
 }

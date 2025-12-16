@@ -25,6 +25,7 @@ import com.marianhello.bgloc.data.BackgroundLocation;
 import com.marianhello.bgloc.data.ConfigurationDAO;
 import com.marianhello.bgloc.data.DAOFactory;
 import com.marianhello.bgloc.data.LocationDAO;
+import com.marianhello.bgloc.data.SettingDAO;
 import com.marianhello.bgloc.provider.LocationProvider;
 import com.marianhello.bgloc.service.LocationService;
 import com.marianhello.bgloc.service.LocationServiceImpl;
@@ -51,10 +52,38 @@ public class BackgroundGeolocationFacade {
     public static final int SERVICE_STOPPED = 0;
     public static final int AUTHORIZATION_AUTHORIZED = 1;
     public static final int AUTHORIZATION_DENIED = 0;
-
-    public static final String[] PERMISSIONS = new String[]{
+    
+    // PATCH: Removed ACTIVITY_RECOGNITION from initial permissions check
+    // This prevents the service from stopping when user denies ACTIVITY_RECOGNITION
+    // The LocationProviderFactory will handle the fallback to DISTANCE_FILTER_PROVIDER
+    public static final String[] INITIALPERMISSIONS = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ? new String[]{
+            // Manifest.permission.ACTIVITY_RECOGNITION, - REMOVED
             Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.ACCESS_FINE_LOCATION
+    }:  new String[]{
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION
+    };
+    // PATCH: Empty BACKGROUNDLOCATIONPERMISSION array
+    // ACCESS_BACKGROUND_LOCATION is NOT required when using Foreground Service (startForeground: true)
+    // The service runs with a persistent notification, so the user is aware of location tracking
+    public static final String[] BACKGROUNDLOCATIONPERMISSION = new String[]{
+            // Manifest.permission.ACCESS_BACKGROUND_LOCATION - REMOVED
+    };
+
+    // PATCH: Removed ACTIVITY_RECOGNITION from PERMISSIONS check
+    // This allows the service to run even without ACTIVITY_RECOGNITION permission
+    // The LocationProviderFactory will handle the fallback to DISTANCE_FILTER_PROVIDER
+    public static final String[] PERMISSIONS = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ? new String[]{
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            // Manifest.permission.ACTIVITY_RECOGNITION - REMOVED
+    }
+    :
+    new String[]{
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION,
     };
 
     private boolean mServiceBroadcastReceiverRegistered = false;
@@ -62,6 +91,7 @@ public class BackgroundGeolocationFacade {
     private boolean mIsPaused = false;
 
     private Config mConfig;
+    private Setting mSetting;
     private final Context mContext;
     private final PluginDelegate mDelegate;
     private final LocationService mService;
@@ -73,6 +103,7 @@ public class BackgroundGeolocationFacade {
     public BackgroundGeolocationFacade(Context context, PluginDelegate delegate) {
         mContext = context;
         mDelegate = delegate;
+
         mService = new LocationServiceProxy(context);
 
         UncaughtExceptionLogger.register(context.getApplicationContext());
@@ -215,14 +246,38 @@ public class BackgroundGeolocationFacade {
         logger.debug("Starting service");
 
         PermissionManager permissionManager = PermissionManager.getInstance(getContext());
-        permissionManager.checkPermissions(Arrays.asList(PERMISSIONS), new PermissionManager.PermissionRequestListener() {
+         permissionManager.checkPermissions(Arrays.asList(INITIALPERMISSIONS), new PermissionManager.PermissionRequestListener() {
             @Override
             public void onPermissionGranted() {
-                logger.info("User granted requested permissions");
-                // watch location mode changes
-                registerLocationModeChangeReceiver();
-                registerServiceBroadcast();
-                startBackgroundService();
+                logger.info("User granted initial requested permissions");
+
+                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q){
+                    permissionManager.checkPermissions(Arrays.asList(BACKGROUNDLOCATIONPERMISSION), new PermissionManager.PermissionRequestListener() {
+                        @Override
+                        public void onPermissionGranted() {
+                            logger.info("User granted background location permissions");
+                            // watch location mode changes
+                            registerLocationModeChangeReceiver();
+                            registerServiceBroadcast();
+                            startBackgroundService();
+                        }
+
+                        @Override
+                        public void onPermissionDenied() {
+                            logger.info("User denied background location permissions");
+                            if (mDelegate != null) {
+                                mDelegate.onAuthorizationChanged(BackgroundGeolocationFacade.AUTHORIZATION_DENIED);
+                            }
+                        }
+                    });
+                }
+                else {
+                    // watch location mode changes
+                    registerLocationModeChangeReceiver();
+                    registerServiceBroadcast();
+                    startBackgroundService();
+                }
+                
             }
 
             @Override
@@ -264,7 +319,7 @@ public class BackgroundGeolocationFacade {
         unregisterLocationModeChangeReceiver();
         unregisterServiceBroadcast();
 
-        if (getConfig().getStopOnTerminate()) {
+        if (getConfig().getStopOnTerminate() || !getSetting().isStarted()) {
             stopBackgroundService();
         } else {
             mService.startHeadlessTask();
@@ -296,6 +351,12 @@ public class BackgroundGeolocationFacade {
         LocationDAO dao = DAOFactory.createLocationDAO(getContext());
         dao.deleteAllLocations();
     }
+
+    public void deleteAllLocationsPermanent(long millisBeforeTimeStamp) {
+        LocationDAO dao = DAOFactory.createLocationDAO(getContext());
+        dao.deleteAllLocationsPermanent(millisBeforeTimeStamp);
+    }
+
 
     public BackgroundLocation getCurrentLocation(int timeout, long maximumAge, boolean enableHighAccuracy) throws PluginException {
         logger.info("Getting current location with timeout:{} maximumAge:{} enableHighAccuracy:{}", timeout, maximumAge, enableHighAccuracy);
@@ -342,12 +403,24 @@ public class BackgroundGeolocationFacade {
         {
             Config newConfig = Config.merge(getStoredConfig(), config);
             persistConfiguration(newConfig);
-            logger.debug("Service configured with: {}", newConfig.toString());
             mConfig = newConfig;
             mService.configure(newConfig);
         } catch (Exception e) {
             logger.error("Configuration error: {}", e.getMessage());
             throw new PluginException("Configuration error", e, PluginException.CONFIGURE_ERROR);
+        }
+    }
+
+    public synchronized void setting(Setting setting) throws PluginException {
+        try
+        {
+            Setting newSetting = Setting.merge(getStoredSetting(), setting);
+            persistSetting(newSetting);
+            mSetting = newSetting;
+            mService.setting(newSetting);
+        } catch (Exception e) {
+            logger.error("Setting error: {}", e.getMessage());
+            throw new PluginException("Setting error", e, PluginException.CONFIGURE_ERROR);
         }
     }
 
@@ -366,6 +439,21 @@ public class BackgroundGeolocationFacade {
         return mConfig;
     }
 
+    public synchronized Setting getSetting() {
+        if (mSetting != null) {
+            return mSetting;
+        }
+
+        try {
+            mSetting = getStoredSetting();
+        } catch (PluginException e) {
+            logger.error("Error getting stored setting will use default", e.getMessage());
+            mSetting = Setting.getDefault();
+        }
+
+        return mSetting;
+    }
+
     public synchronized Config getStoredConfig() throws PluginException {
         try {
             ConfigurationDAO dao = DAOFactory.createConfigurationDAO(getContext());
@@ -377,6 +465,20 @@ public class BackgroundGeolocationFacade {
         } catch (JSONException e) {
             logger.error("Error getting stored config: {}", e.getMessage());
             throw new PluginException("Error getting stored config", e, PluginException.JSON_ERROR);
+        }
+    }
+
+    public synchronized Setting getStoredSetting() throws PluginException {
+        try {
+            SettingDAO dao = DAOFactory.createSettingDAO(getContext());
+            Setting setting = dao.retrieveSetting();
+            if (setting == null) {
+                setting = Setting.getDefault();
+            }
+            return setting;
+        } catch (JSONException e) {
+            logger.error("Error getting stored Setting: {}", e.getMessage());
+            throw new PluginException("Error getting stored Setting", e, PluginException.JSON_ERROR);
         }
     }
 
@@ -455,6 +557,10 @@ public class BackgroundGeolocationFacade {
     private void persistConfiguration(Config config) throws NullPointerException {
         ConfigurationDAO dao = DAOFactory.createConfigurationDAO(getContext());
         dao.persistConfiguration(config);
+    }
+    private void persistSetting(Setting setting) throws NullPointerException {
+        SettingDAO dao = DAOFactory.createSettingDAO(getContext());
+        dao.persistSetting(setting);
     }
 
     private Context getContext() {

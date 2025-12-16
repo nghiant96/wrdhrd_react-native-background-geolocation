@@ -16,6 +16,7 @@ import com.marianhello.bgloc.BackgroundGeolocationFacade;
 import com.marianhello.bgloc.Config;
 import com.marianhello.bgloc.PluginDelegate;
 import com.marianhello.bgloc.PluginException;
+import com.marianhello.bgloc.Setting;
 import com.marianhello.bgloc.data.BackgroundActivity;
 import com.marianhello.bgloc.data.BackgroundLocation;
 import com.marianhello.bgloc.react.data.LocationMapper;
@@ -106,6 +107,7 @@ public class BackgroundGeolocationModule extends ReactContextBaseJavaModule impl
      */
     @Override
     public void onHostResume() {
+        if (getContext() == null || facade == null) return;
         logger.info("App will be resumed");
         facade.resume();
         sendEvent(FOREGROUND_EVENT, null);
@@ -116,6 +118,7 @@ public class BackgroundGeolocationModule extends ReactContextBaseJavaModule impl
      */
     @Override
     public void onHostPause() {
+        if (getContext() == null || facade == null) return;
         logger.info("App will be paused");
         facade.pause();
         sendEvent(BACKGROUND_EVENT, null);
@@ -127,10 +130,13 @@ public class BackgroundGeolocationModule extends ReactContextBaseJavaModule impl
      */
     @Override
     public void onHostDestroy() {
+        if (getContext() == null || facade == null) return;
         logger.info("Destroying plugin");
         facade.destroy();
 //        facade = null;
     }
+
+
 
     private void runOnBackgroundThread(Runnable runnable) {
         // currently react-native has no other thread we can run on
@@ -140,12 +146,29 @@ public class BackgroundGeolocationModule extends ReactContextBaseJavaModule impl
 
     @ReactMethod
     public void start() {
-        facade.start();
+        try {
+            Setting setting = new Setting();
+            setting.setStarted(true);
+            setting.setUpdatedAt((int) RealTimeHelper.now().getTime());
+            facade.setting(setting);
+            facade.start();
+        }
+        catch(Exception ignore){
+        }
     }
 
     @ReactMethod
     public void stop() {
         facade.stop();
+
+        try {
+            Setting setting = new Setting();
+            setting.setStarted(false);
+            setting.setUpdatedAt((int) RealTimeHelper.now().getTime());
+            facade.setting(setting);
+        }
+        catch(Exception ignore){
+        }
     }
 
     @ReactMethod
@@ -245,6 +268,15 @@ public class BackgroundGeolocationModule extends ReactContextBaseJavaModule impl
         runOnBackgroundThread(new Runnable() {
             public void run() {
                 facade.deleteAllLocations();
+                success.invoke(true);
+            }
+        });
+    }
+    @ReactMethod
+    public void deleteAllLocationsPermanent(final double millisBeforeTimeStamp,final Callback success, Callback error) {
+        runOnBackgroundThread(new Runnable() {
+            public void run() {
+                facade.deleteAllLocationsPermanent((long)millisBeforeTimeStamp);
                 success.invoke(true);
             }
         });

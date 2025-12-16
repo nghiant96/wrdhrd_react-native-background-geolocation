@@ -25,6 +25,7 @@ import android.os.Bundle;
 
 import com.marianhello.bgloc.Config;
 import com.marianhello.bgloc.provider.AbstractLocationProvider;
+import com.marianhello.utils.ProviderSelector;
 import com.marianhello.utils.ToneGenerator.Tone;
 
 import java.util.List;
@@ -56,6 +57,7 @@ public class DistanceFilterLocationProvider extends AbstractLocationProvider imp
     private Integer locationAcquisitionAttempts = 0;
 
     private Location lastLocation;
+    private long lastLocationTime = 0;
     private Location stationaryLocation;
     private float stationaryRadius;
     private PendingIntent stationaryAlarmPI;
@@ -73,8 +75,7 @@ public class DistanceFilterLocationProvider extends AbstractLocationProvider imp
     private boolean isStarted = false;
 
     public DistanceFilterLocationProvider(Context context) {
-        super(context);
-        PROVIDER_ID = Config.DISTANCE_FILTER_PROVIDER;
+        super(context,Config.DISTANCE_FILTER_PROVIDER);
     }
 
     @Override
@@ -85,19 +86,27 @@ public class DistanceFilterLocationProvider extends AbstractLocationProvider imp
         alarmManager = (AlarmManager) mContext.getSystemService(Context.ALARM_SERVICE);
 
         // Stop-detection PI
-        stationaryAlarmPI = PendingIntent.getBroadcast(mContext, 0, new Intent(STATIONARY_ALARM_ACTION), PendingIntent.FLAG_IMMUTABLE);
+        Intent stationaryAlarmActionIntent = new Intent(STATIONARY_ALARM_ACTION);
+        stationaryAlarmActionIntent.setPackage(mContext.getPackageName());
+        stationaryAlarmPI = PendingIntent.getBroadcast(mContext, 0, stationaryAlarmActionIntent, PendingIntent.FLAG_MUTABLE );
         registerReceiver(stationaryAlarmReceiver, new IntentFilter(STATIONARY_ALARM_ACTION));
 
         // Stationary region PI
-        stationaryRegionPI = PendingIntent.getBroadcast(mContext, 0, new Intent(STATIONARY_REGION_ACTION), PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Intent stationaryRegionActionIntent = new Intent(STATIONARY_REGION_ACTION);
+        stationaryRegionActionIntent.setPackage(mContext.getPackageName());
+        stationaryRegionPI = PendingIntent.getBroadcast(mContext, 0, stationaryRegionActionIntent, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE);
         registerReceiver(stationaryRegionReceiver, new IntentFilter(STATIONARY_REGION_ACTION));
 
         // Stationary location monitor PI
-        stationaryLocationPollingPI = PendingIntent.getBroadcast(mContext, 0, new Intent(STATIONARY_LOCATION_MONITOR_ACTION), PendingIntent.FLAG_IMMUTABLE);
+        Intent stationaryLocationMonitorActionIntent = new Intent(STATIONARY_LOCATION_MONITOR_ACTION);
+        stationaryLocationMonitorActionIntent.setPackage(mContext.getPackageName());
+        stationaryLocationPollingPI = PendingIntent.getBroadcast(mContext, 0, stationaryLocationMonitorActionIntent, PendingIntent.FLAG_MUTABLE);
         registerReceiver(stationaryLocationMonitorReceiver, new IntentFilter(STATIONARY_LOCATION_MONITOR_ACTION));
 
         // One-shot PI (TODO currently unused)
-        singleUpdatePI = PendingIntent.getBroadcast(mContext, 0, new Intent(SINGLE_LOCATION_UPDATE_ACTION), PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Intent singleLocationUpdateActionIntent = new Intent(SINGLE_LOCATION_UPDATE_ACTION);
+        singleLocationUpdateActionIntent.setPackage(mContext.getPackageName());
+        singleUpdatePI = PendingIntent.getBroadcast(mContext, 0, singleLocationUpdateActionIntent, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_MUTABLE);
         registerReceiver(singleUpdateReceiver, new IntentFilter(SINGLE_LOCATION_UPDATE_ACTION));
 
         // Location criteria
@@ -115,6 +124,7 @@ public class DistanceFilterLocationProvider extends AbstractLocationProvider imp
         }
 
         logger.info("Start recording");
+        super.onStart();
         scaledDistanceFilter = mConfig.getDistanceFilter();
         isStarted = true;
         setPace(false);
@@ -127,6 +137,7 @@ public class DistanceFilterLocationProvider extends AbstractLocationProvider imp
         }
 
         try {
+            super.onStop();
             locationManager.removeUpdates(this);
             locationManager.removeProximityAlert(stationaryRegionPI);
         } catch (SecurityException e) {
@@ -202,7 +213,9 @@ public class DistanceFilterLocationProvider extends AbstractLocationProvider imp
                     }
                 }
             } else {
-                locationManager.requestLocationUpdates(locationManager.getBestProvider(criteria, true), mConfig.getInterval(), scaledDistanceFilter, this);
+                String provider = ProviderSelector.getBestProvider(locationManager,mConfig);
+                //locationManager.requestLocationUpdates(locationManager.getBestProvider(criteria, true), mConfig.getInterval(), scaledDistanceFilter, this);
+                locationManager.requestLocationUpdates(provider, mConfig.getInterval(), scaledDistanceFilter, this);
             }
         } catch (SecurityException e) {
             logger.error("Security exception: {}", e.getMessage());
@@ -337,6 +350,7 @@ public class DistanceFilterLocationProvider extends AbstractLocationProvider imp
         }
         // Go ahead and cache, push to server
         lastLocation = location;
+        lastLocationTime = System.currentTimeMillis();
         handleLocation(location);
     }
 
@@ -416,6 +430,8 @@ public class DistanceFilterLocationProvider extends AbstractLocationProvider imp
 
     public void onPollStationaryLocation(Location location) {
         float stationaryRadius = mConfig.getStationaryRadius();
+        long stationaryInterval = mConfig.getStationaryInterval();
+
         if (isMoving) {
             return;
         }
@@ -431,13 +447,42 @@ public class DistanceFilterLocationProvider extends AbstractLocationProvider imp
         // TODO http://www.cse.buffalo.edu/~demirbas/publications/proximity.pdf
         // determine if we're almost out of stationary-distance and increase monitoring-rate.
         logger.info("Distance from stationary location: {}", distance);
+        logger.info("Distance interval: {}", stationaryInterval);
         if (distance > stationaryRadius) {
             onExitStationaryRegion(location);
-        } else if (distance > 0) {
-            startPollingStationaryLocation(STATIONARY_LOCATION_POLLING_INTERVAL_AGGRESSIVE);
-        } else if (stationaryLocationPollingInterval != STATIONARY_LOCATION_POLLING_INTERVAL_LAZY) {
-            startPollingStationaryLocation(STATIONARY_LOCATION_POLLING_INTERVAL_LAZY);
-        }
+        } else {
+            long timeDiff = 0;
+            
+            if(lastLocation != null){
+                logger.debug("Last Location Time: {}", lastLocation.getTime());
+            }
+            else{
+                logger.debug("Last Location is null ");
+            }
+
+            if ( stationaryInterval > 0) {
+                if(lastLocationTime == 0 && stationaryLocation != null){
+                   lastLocationTime = stationaryLocation.getTime();
+                }
+                 
+                if(lastLocationTime != 0){
+                    timeDiff = System.currentTimeMillis() - lastLocationTime;
+                }
+                
+                logger.debug("Stationary change Time Change: {}", timeDiff);
+                if(stationaryInterval < timeDiff){
+                    lastLocation = location;
+                    lastLocationTime = System.currentTimeMillis();
+                    handleLocation(location);
+                }
+            }
+            
+            if (distance > 0) {
+                startPollingStationaryLocation(STATIONARY_LOCATION_POLLING_INTERVAL_AGGRESSIVE);
+            } else if (stationaryLocationPollingInterval != STATIONARY_LOCATION_POLLING_INTERVAL_LAZY) {
+                startPollingStationaryLocation(STATIONARY_LOCATION_POLLING_INTERVAL_LAZY);
+            }
+        } 
     }
 
     /**

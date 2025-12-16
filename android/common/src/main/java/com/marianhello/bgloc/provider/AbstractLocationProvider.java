@@ -17,15 +17,19 @@ import android.location.Location;
 import android.media.AudioManager;
 import android.provider.Settings;
 import android.widget.Toast;
-
+import android.os.Build;
 import com.google.android.gms.location.DetectedActivity;
 import com.marianhello.bgloc.Config;
 import com.marianhello.bgloc.PluginException;
 import com.marianhello.bgloc.data.BackgroundActivity;
 import com.marianhello.bgloc.data.BackgroundLocation;
+import com.marianhello.bgloc.data.BatteryUtils;
 import com.marianhello.logging.LoggerManager;
 import com.marianhello.utils.ToneGenerator;
 import com.marianhello.utils.ToneGenerator.Tone;
+import com.nghiant96.ActivityRecognition.ActivityTransitionService;
+
+import java.lang.reflect.Field;
 
 /**
  * AbstractLocationProvider
@@ -41,26 +45,62 @@ public abstract class AbstractLocationProvider implements LocationProvider {
 
     private ProviderDelegate mDelegate;
 
-    protected AbstractLocationProvider(Context context) {
+    private ActivityTransitionService mActivityTransitionDetectionService;
+    private Location lastLocation;
+
+    protected AbstractLocationProvider(Context context, Integer provider_id) {
         mContext = context;
         logger = LoggerManager.getLogger(getClass());
+        this.PROVIDER_ID=provider_id;
+        
+        // PATCH: If we reach here with FUSED_PROVIDER, it means LocationProviderFactory verified
+        // that ACTIVITY_RECOGNITION permission is granted (or not required on Android < 10).
+        // Safe to initialize ActivityTransitionService.
+        if (provider_id == Config.FUSED_PROVIDER) {
+            logger.info("Initializing FUSED_PROVIDER with ActivityTransitionService");
+            mActivityTransitionDetectionService = new ActivityTransitionService(mContext);
+        }
+        
         logger.info("Creating {}", getClass().getSimpleName());
     }
 
     @Override
     public void onCreate() {
         toneGenerator = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100);
+        if (mActivityTransitionDetectionService != null){
+            mActivityTransitionDetectionService.onCreate();
+        }
+    }
+
+    @Override
+    public void onStart() {
+        if (mActivityTransitionDetectionService != null){
+            mActivityTransitionDetectionService.startActivity();
+        }
+    }
+
+    @Override
+    public void onStop() {
+        if (mActivityTransitionDetectionService != null) {
+            mActivityTransitionDetectionService.stopActivity();
+        }
     }
 
     @Override
     public void onDestroy() {
         toneGenerator.release();
+        if (mActivityTransitionDetectionService != null) {
+            mActivityTransitionDetectionService.onDestroy();
+        }
         toneGenerator = null;
     }
 
     @Override
     public void onConfigure(Config config) {
         mConfig = config;
+        if (mActivityTransitionDetectionService != null) {
+            mActivityTransitionDetectionService.setProperties(this.mConfig, this.PROVIDER_ID);
+        }
     }
 
     @Override
@@ -70,6 +110,9 @@ public abstract class AbstractLocationProvider implements LocationProvider {
 
     public void setDelegate(ProviderDelegate delegate) {
         mDelegate = delegate;
+        if (mActivityTransitionDetectionService != null) {
+            mActivityTransitionDetectionService.setDelegate(delegate);
+        }
     }
 
     /**
@@ -77,6 +120,16 @@ public abstract class AbstractLocationProvider implements LocationProvider {
      * @param receiver
      */
     protected Intent registerReceiver (BroadcastReceiver receiver, IntentFilter filter) {
+        if (Build.VERSION.SDK_INT >= 34) {
+            try {
+                Field receiverExportedField = Context.class.getField("RECEIVER_NOT_EXPORTED");
+                int receiverExported = receiverExportedField.getInt(null);
+                return mContext.registerReceiver(receiver, filter, receiverExported);
+            } catch (NoSuchFieldException | IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+
+        }
         return mContext.registerReceiver(receiver, filter);
     }
 
@@ -95,7 +148,17 @@ public abstract class AbstractLocationProvider implements LocationProvider {
     protected void handleLocation (Location location) {
         playDebugTone(Tone.BEEP);
         if (mDelegate != null) {
-            BackgroundLocation bgLocation = new BackgroundLocation(PROVIDER_ID, location);
+            //Prevent Duplicate Location
+            if(lastLocation != null) {
+                if(lastLocation.getTime() == location.getTime()) return;
+            }
+            lastLocation = location;
+
+            BatteryUtils.BatteryInfo batteryInfo = BatteryUtils.getBatteryStatus(mContext);
+            BackgroundLocation bgLocation = BackgroundLocation.fromLocation(location);
+            bgLocation.setLocationProvider(PROVIDER_ID);
+            bgLocation.setBatteryLevel(batteryInfo.getBatteryPercentage());
+            bgLocation.setIsCharging(batteryInfo.isCharging());
             bgLocation.setMockLocationsEnabled(hasMockLocationsEnabled());
             mDelegate.onLocation(bgLocation);
         }
@@ -110,9 +173,13 @@ public abstract class AbstractLocationProvider implements LocationProvider {
     protected void handleStationary (Location location, float radius) {
         playDebugTone(Tone.LONG_BEEP);
         if (mDelegate != null) {
-            BackgroundLocation bgLocation = new BackgroundLocation(PROVIDER_ID, location);
-            bgLocation.setRadius(radius);
+            BatteryUtils.BatteryInfo batteryInfo = BatteryUtils.getBatteryStatus(mContext);
+            BackgroundLocation bgLocation = BackgroundLocation.fromLocation(location);
+            bgLocation.setLocationProvider(PROVIDER_ID);
+            bgLocation.setBatteryLevel(batteryInfo.getBatteryPercentage());
+            bgLocation.setIsCharging(batteryInfo.isCharging());
             bgLocation.setMockLocationsEnabled(hasMockLocationsEnabled());
+            bgLocation.setRadius(radius);
             mDelegate.onStationary(bgLocation);
         }
     }
@@ -125,7 +192,11 @@ public abstract class AbstractLocationProvider implements LocationProvider {
     protected void handleStationary (Location location) {
         playDebugTone(Tone.LONG_BEEP);
         if (mDelegate != null) {
-            BackgroundLocation bgLocation = new BackgroundLocation(PROVIDER_ID, location);
+            BatteryUtils.BatteryInfo batteryInfo = BatteryUtils.getBatteryStatus(mContext);
+            BackgroundLocation bgLocation = BackgroundLocation.fromLocation(location);
+            bgLocation.setLocationProvider(PROVIDER_ID);
+            bgLocation.setBatteryLevel(batteryInfo.getBatteryPercentage());
+            bgLocation.setIsCharging(batteryInfo.isCharging());
             bgLocation.setMockLocationsEnabled(hasMockLocationsEnabled());
             mDelegate.onStationary(bgLocation);
         }
